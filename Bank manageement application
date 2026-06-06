@@ -1,0 +1,132 @@
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <string>
+#include <vector>
+using namespace std;
+class BankAccount {
+private:
+    int accountNumber;
+    string accountHolderName;
+    double balance;
+public:
+    BankAccount() : accountNumber(0), accountHolderName(""), balance(0.0) {}
+    
+    BankAccount(int accNum, string name, double initialBalance) {
+        accountNumber = accNum;
+        accountHolderName = name;
+        balance = initialBalance;
+    }
+    int getAccountNumber() const { return accountNumber; }
+    string getAccountHolderName() const { return accountHolderName; }
+    double getBalance() const { return balance; }
+    void deposit(double amount) {
+        if (amount > 0) {
+            balance += amount;
+            cout << "💵 Successfully deposited $" << fixed << setprecision(2) << amount << "\n";
+        } else {
+            cout << "⚠️ Invalid deposit amount!\n";
+        }
+    }
+
+    bool withdraw(double amount) {
+        if (amount <= 0) {
+            cout << "⚠️ Invalid withdrawal amount!\n";
+            return false;
+        }
+        if (amount > balance) {
+            cout << "❌ Insufficient funds! Current Balance: $" << fixed << setprecision(2) << balance << "\n";
+            return false;
+        }
+        balance -= amount;
+        cout << "💸 Successfully withdrew $" << fixed << setprecision(2) << amount << "\n";
+        return true;
+    }
+    void writeToFile(ofstream &out) const {
+        out << accountNumber << "," << accountHolderName << "," << balance << "\n";
+    }
+};
+class BankManager {
+private:
+    string filename;
+    vector<string> split(const string &str, char delimiter) {
+        vector<string> tokens;
+        string token;
+        for (char ch : str) {
+            if (ch == delimiter) {
+                tokens.push_back(token);
+                token = "";
+            } else {
+                token += ch;
+            }
+        }
+        tokens.push_back(token);
+        return tokens;
+    }
+    vector<BankAccount> loadAllAccounts() {
+        vector<BankAccount> accounts;
+        ifstream infile(filename);
+        if (!infile) return accounts; 
+
+        string line;
+        while (getline(infile, line)) {
+            if (line.empty()) continue;
+            vector<string> data = split(line, ',');
+            if (data.size() == 3) {
+                try {
+                    int accNum = stoi(data[0]);
+                    string name = data[1];
+                    double bal = stod(data[2]);
+                    accounts.push_back(BankAccount(accNum, name, bal));
+                } catch (...) {
+                }
+            }
+        }
+        infile.close();
+        return accounts;
+    }
+    void saveAllAccounts(const vector<BankAccount> &accounts) {
+        ofstream outfile(filename, ios::trunc);
+        for (const auto &acc : accounts) {
+            acc.writeToFile(outfile);
+        }
+        outfile.close();
+    }
+
+public:
+    BankManager(string file) : filename(file) {}
+    void createAccount() {
+        int accNum;
+        string name;
+        double initialDeposit;
+
+        cout << "\n--- Open New Bank Account ---\n";
+        cout << "Enter a New Account Number: ";
+        while (!(cin >> accNum)) {
+            cout << "Invalid input. Enter a numeric Account Number: ";
+            cin.clear();
+            cin.ignore(1000, '\n');
+        }
+        cin.ignore();
+
+        vector<BankAccount> accounts = loadAllAccounts();
+        for (const auto &acc : accounts) {
+            if (acc.getAccountNumber() == accNum) {
+                cout << "❌ Error: Account number " << accNum << " already exists!\n";
+                return;
+            }
+        }
+
+        cout << "Enter Account Holder Name: ";
+        getline(cin, name);
+        
+        cout << "Enter Initial Deposit Amount: $";
+        while (!(cin >> initialDeposit) || initialDeposit < 0) {
+            cout << "Invalid amount. Enter a valid initial deposit: $";
+            cin.clear();
+            cin.ignore(1000, '\n');
+        }
+
+        accounts.push_back(BankAccount(accNum, name, initialDeposit));
+        saveAllAccounts(accounts);
+        cout << "✅ Account created successfully for " << name << "!\n
