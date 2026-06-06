@@ -1,0 +1,244 @@
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <string>
+#include <vector>
+using namespace std;
+
+class Student {
+private:
+    int rollNumber;
+    string name;
+    string course;
+    string grade;
+
+public:
+    Student() : rollNumber(0), name(""), course(""), grade("") {}
+    
+    Student(int roll, string n, string c, string g) {
+        rollNumber = roll;
+        name = n;
+        course = c;
+        grade = g;
+    }
+    int getRollNumber() const { return rollNumber; }
+    string getName() const { return name; }
+    string getCourse() const { return course; }
+    string getGrade() const { return grade; }
+    void setName(string n) { name = n; }
+    void setCourse(string c) { course = c; }
+    void setGrade(string g) { grade = g; }
+    void writeToFile(ofstream &out) const {
+        out << rollNumber << "," << name << "," << course << "," << grade << "\n";
+    }
+};
+class StudentManager {
+private:
+    string filename;
+    vector<string> split(const string &str, char delimiter) {
+        vector<string> tokens;
+        string token;
+        for (char ch : str) {
+            if (ch == delimiter) {
+                tokens.push_back(token);
+                token = "";
+            } else {
+                token += ch;
+            }
+        }
+        tokens.push_back(token);
+        return tokens;
+    }
+    vector<Student> loadAllStudents() {
+        vector<Student> students;
+        ifstream infile(filename);
+        if (!infile) return students; // Return empty if file doesn't exist yet
+
+        string line;
+        while (getline(infile, line)) {
+            if (line.empty()) continue;
+            vector<string> data = split(line, ',');
+            if (data.size() == 4) {
+                try {
+                    int roll = stoi(data[0]);
+                    students.push_back(Student(roll, data[1], data[2], data[3]));
+                } catch (...) {
+                    // Ignore corrupted lines
+                }
+            }
+        }
+        infile.close();
+        return students;
+    }
+    void saveAllStudents(const vector<Student> &students) {
+        ofstream outfile(filename, ios::trunc);
+        for (const auto &student : students) {
+            student.writeToFile(outfile);
+        }
+        outfile.close();
+    }
+
+public:
+    StudentManager(string file) : filename(file) {}
+    void addStudent() {
+        int roll;
+        string name, course, grade;
+
+        cout << "\n--- Add New Student ---\n";
+        cout << "Enter Roll Number: ";
+        while (!(cin >> roll)) {
+            cout << "Invalid input. Enter a numeric Roll Number: ";
+            cin.clear();
+            cin.ignore(1000, '\n');
+        }
+        cin.ignore(); 
+        vector<Student> students = loadAllStudents();
+        for (const auto &s : students) {
+            if (s.getRollNumber() == roll) {
+                cout << "❌ Error: Student with Roll Number " << roll << " already exists!\n";
+                return;
+            }
+        }
+
+        cout << "Enter Name: ";
+        getline(cin, name);
+        cout << "Enter Course: ";
+        getline(cin, course);
+        cout << "Enter Grade: ";
+        getline(cin, grade);
+
+        students.push_back(Student(roll, name, course, grade));
+        saveAllStudents(students);
+        cout << "✅ Student record added successfully!\n";
+    }
+    void displayAll() {
+        vector<Student> students = loadAllStudents();
+        if (students.empty()) {
+            cout << "\n📭 No student records found.\n";
+            return;
+        }
+
+        cout << "\n" << string(60, '=') << "\n";
+        cout << left << setw(12) << "Roll No" 
+             << setw(20) << "Name" 
+             << setw(18) << "Course" 
+             << setw(10) << "Grade" << "\n";
+        cout << string(60, '=') << "\n";
+
+        for (const auto &s : students) {
+            cout << left << setw(12) << s.getRollNumber()
+                 << setw(20) << s.getName()
+                 << setw(18) << s.getCourse()
+                 << setw(10) << s.getGrade() << "\n";
+        }
+        cout << string(60, '=') << "\n";
+    }
+    void updateStudent() {
+        int roll;
+        cout << "\n--- Update Student Record ---\n";
+        cout << "Enter Roll Number to update: ";
+        cin >> roll;
+        cin.ignore();
+
+        vector<Student> students = loadAllStudents();
+        bool found = false;
+
+        for (auto &s : students) {
+            if (s.getRollNumber() == roll) {
+                found = true;
+                string input;
+
+                cout << "Current Name: " << s.getName() << " (Press Enter to keep unchanged): ";
+                getline(cin, input);
+                if (!input.empty()) s.setName(input);
+
+                cout << "Current Course: " << s.getCourse() << " (Press Enter to keep unchanged): ";
+                getline(cin, input);
+                if (!input.empty()) s.setCourse(input);
+
+                cout << "Current Grade: " << s.getGrade() << " (Press Enter to keep unchanged): ";
+                getline(cin, input);
+                if (!input.empty()) s.setGrade(input);
+
+                break;
+            }
+        }
+
+        if (found) {
+            saveAllStudents(students);
+            cout << "✅ Student record updated successfully!\n";
+        } else {
+            cout << "❌ Error: Student with Roll Number " << roll << " not found.\n";
+        }
+    }
+    void deleteStudent() {
+        int roll;
+        cout << "\n--- Delete Student Record ---\n";
+        cout << "Enter Roll Number to delete: ";
+        cin >> roll;
+
+        vector<Student> students = loadAllStudents();
+        bool found = false;
+
+        for (auto it = students.begin(); it != students.end(); ++it) {
+            if (it->getRollNumber() == roll) {
+                students.erase(it);
+                found = true;
+                break;
+            }
+        }
+
+        if (found) {
+            saveAllStudents(students);
+            cout << "🗑️ Student record deleted successfully!\n";
+        } else {
+            cout << "❌ Error: Student with Roll Number " << roll << " not found.\n";
+        }
+    }
+};
+
+int main() {
+    StudentManager manager("students_db.txt"); 
+    int choice;
+
+    do {
+        cout << "\n===============================\n";
+        cout << "   STUDENT MANAGEMENT SYSTEM   \n";
+        cout << "===============================\n";
+        cout << "1. Add Student Record\n";
+        cout << "2. Display All Records\n";
+        cout << "3. Update Student Record\n";
+        cout << "4. Delete Student Record\n";
+        cout << "5. Exit\n";
+        cout << "-------------------------------\n";
+        cout << "Enter your choice (1-5): ";
+        
+        while (!(cin >> choice)) {
+            cout << "Invalid selection. Please enter a number between 1 and 5: ";
+            cin.clear();
+            cin.ignore(1000, '\n');
+        }
+
+        switch (choice) {
+            case 1:
+                manager.addStudent();
+                break;
+            case 2:
+                manager.displayAll();
+                break;
+            case 3:
+                manager.updateStudent();
+                break;
+            case 4:
+                manager.deleteStudent();
+                break;
+            case 5:
+                cout << "\nExiting application. Goodbye!\n";
+                break;
+            default:
+                cout << "⚠️ Invalid choice. Try again.\n";
+        }
+    } while (choice != 5);
+
+    return 0;
+}
