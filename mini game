@@ -1,0 +1,213 @@
+#include <iostream>
+#include <vector>
+#include <cstdlib>
+#include <ctime>
+#ifdef _WIN32
+#include <conio.h>
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <termios.h>
+#include <fcntl.h>
+#endif
+using namespace std;
+class SnakeGame {
+private:
+    bool gameOver;
+    const int width = 20;
+    const int height = 17;
+    int headX, headY, fruitX, fruitY, score;
+    
+    enum Direction { STOP = 0, LEFT, RIGHT, UP, DOWN };
+    Direction dir;
+    
+    vector<int> tailX, tailY;
+    int nTail;
+    int kbhit() {
+#ifdef _WIN32
+        return _kbhit();
+#else
+        struct termios oldt, newt;
+        int ch;
+        int oldf;
+        tcgetattr(STDIN_FILENO, &oldt);
+        newt = oldt;
+        newt.c_lflag &= ~(ICANON | ECHO);
+        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+        fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+        ch = getchar();
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        fcntl(STDIN_FILENO, F_SETFL, oldf);
+        if(ch != EOF) {
+            ungetc(ch, stdin);
+            return 1;
+        }
+        return 0;
+#endif
+    }
+
+    char getch() {
+#ifdef _WIN32
+        return _getch();
+#else
+        char ch;
+        struct termios oldt, newt;
+        tcgetattr(STDIN_FILENO, &oldt);
+        newt = oldt;
+        newt.c_lflag &= ~(ICANON | ECHO);
+        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        ch = getchar();
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        return ch;
+#endif
+    }
+
+    void clearScreen() {
+#ifdef _WIN32
+        system("cls");
+#else
+        system("clear");
+#endif
+    }
+
+    void sleepMs(int ms) {
+#ifdef _WIN32
+        Sleep(ms);
+#else
+        usleep(ms * 1000);
+#endif
+    }
+
+public:
+    void Setup() {
+        srand(time(NULL));
+        gameOver = false;
+        dir = STOP;
+        headX = width / 2;
+        headY = height / 2;
+        fruitX = rand() % width;
+        fruitY = rand() % height;
+        score = 0;
+        nTail = 0;
+        tailX.clear();
+        tailY.clear();
+    }
+
+    void Draw() {
+        clearScreen();
+        cout << "========================================" << endl;
+        cout << "        CLASSIC C++ SNAKE GAME          " << endl;
+        cout << "========================================" << endl;
+        for (int i = 0; i < width + 2; i++) cout << "#";
+        cout << endl;
+        for (int i = 0; i < height; i++) {
+            for (int j = 0; j < width; j++) {
+                if (j == 0) cout << "#"; // Left Border
+
+                if (i == headY && j == headX) {
+                    cout << "O"; // Snake Head
+                } else if (i == fruitY && j == fruitX) {
+                    cout << "*"; // Fruit
+                } else {
+                    bool printTail = false;
+                    for (int k = 0; k < nTail; k++) {
+                        if (tailX[k] == j && tailY[k] == i) {
+                            cout << "o"; // Snake Tail
+                            printTail = true;
+                            break;
+                        }
+                    }
+                    if (!printTail) cout << " ";
+                }
+
+                if (j == width - 1) cout << "#"; // Right Border
+            }
+            cout << endl;
+        }
+        for (int i = 0; i < width + 2; i++) cout << "#";
+        cout << endl;
+
+        cout << "Score: " << score << "   |  Controls: W/A/S/D (X to Exit)" << endl;
+    }
+
+    void Input() {
+        if (kbhit()) {
+            switch (getch()) {
+                case 'a': case 'A': if (dir != RIGHT) dir = LEFT; break;
+                case 'd': case 'D': if (dir != LEFT) dir = RIGHT; break;
+                case 'w': case 'W': if (dir != DOWN) dir = UP; break;
+                case 's': case 'S': if (dir != UP) dir = DOWN; break;
+                case 'x': case 'X': gameOver = true; break;
+            }
+        }
+    }
+
+    void Logic() {
+        if (dir == STOP) return;
+        int prevX = headX;
+        int prevY = headY;
+        int prev2X, prev2Y;
+        
+        if (tailX.size() < (size_t)nTail) {
+            tailX.resize(nTail);
+            tailY.resize(nTail);
+        }
+
+        for (int i = 0; i < nTail; i++) {
+            prev2X = tailX[i];
+            prev2Y = tailY[i];
+            tailX[i] = prevX;
+            tailY[i] = prevY;
+            prevX = prev2X;
+            prevY = prev2Y;
+        }
+        switch (dir) {
+            case LEFT:  headX--; break;
+            case RIGHT: headX++; break;
+            case UP:    headY--; break;
+            case DOWN:  headY++; break;
+            default: break;
+        }
+        if (headX >= width || headX < 0 || headY >= height || headY < 0) {
+            gameOver = true;
+        }
+        for (int i = 0; i < nTail; i++) {
+            if (tailX[i] == headX && tailY[i] == headY) {
+                gameOver = true;
+            }
+        }
+        if (headX == fruitX && headY == fruitY) {
+            score += 10;
+            nTail++;
+            fruitX = rand() % width;
+            fruitY = rand() % height;
+        }
+    }
+
+    bool isGameOver() const { return gameOver; }
+    int getScore() const { return score; }
+};
+
+int main() {
+    char replayChoice;
+    do {
+        SnakeGame game;
+        game.Setup();
+        
+        while (!game.isGameOver()) {
+            game.Draw();
+            game.Input();
+            game.Logic();
+            game.sleepMs(100); 
+        }
+
+        cout << "\n💥 GAME OVER! Final Score: " << game.getScore() << endl;
+        cout << "Would you like to try again? (y/n): ";
+        cin >> replayChoice;
+
+    } while (replayChoice == 'y' || replayChoice == 'Y');
+
+    cout << "\nThanks for playing! Mini-game application shutting down." << endl;
+    return 0;
+}
